@@ -6,6 +6,8 @@
 using namespace std;
 
 #include "Trie.h"
+#include <map>
+#include <algorithm>
 struct SeqIndex
 {
     unsigned long genomePos;
@@ -30,15 +32,22 @@ private:
     vector<Genome> m_genomeLibrary;
     Trie<SeqIndex> m_seqTrie;
 };
-
-bool orderGenomeIndices(SeqIndex &a, SeqIndex &b) {
+bool orderGenomeIndices(SeqIndex &a, SeqIndex &b)
+{
     if (a.genomePos < b.genomePos)
         return true;
     else if (a.genomePos == b.genomePos)
         return (a.subSeqPos < b.subSeqPos);
     return false;
 }
-
+bool orderRelatedGenomes(GenomeMatch &a, GenomeMatch &b)
+{
+    if (a.percentMatch > b.percentMatch)
+        return true;
+    else if (a.percentMatch == b.percentMatch)
+        return (a.genomeName < b.genomeName);
+    return false;
+}
 GenomeMatcherImpl::GenomeMatcherImpl(int minSearchLength)
 {
     m_minSearchLength = minSearchLength;
@@ -66,17 +75,11 @@ bool GenomeMatcherImpl::findGenomesWithThisDNA(const string& fragment, int minim
 {
     if (fragment.size() < minimumLength || minimumLength < m_minSearchLength)
         return false;
-    matches.empty();
+    matches.clear();
     vector<SeqIndex> result = m_seqTrie.find(fragment.substr(0, m_minSearchLength), exactMatchOnly);
     if (result.empty())
         return false;
     sort(result.begin(), result.end(), orderGenomeIndices);
-//    for (int i = 0; i < result.size(); i++)
-//    {
-//        cerr << result[i].genomePos << " ";
-//        cerr << m_genomeLibrary[result[i].genomePos].name() << endl;
-//    }
-//    cerr << endl;
     unsigned long currentGenomePos = result[0].genomePos;
     unsigned long largestFoundLengthForCurrGenome = 0;
     unsigned long correspondingPosition = 0;
@@ -139,13 +142,49 @@ bool GenomeMatcherImpl::findGenomesWithThisDNA(const string& fragment, int minim
         toAdd.position = (int)correspondingPosition;
         matches.push_back(toAdd);
     }
-    
-    return true;  // This compiles, but may not be correct
+    if (matches.empty())
+        return false;
+    return true;
 }
 
 bool GenomeMatcherImpl::findRelatedGenomes(const Genome& query, int fragmentMatchLength, bool exactMatchOnly, double matchPercentThreshold, vector<GenomeMatch>& results) const
 {
-    return false;  // This compiles, but may not be correct
+    if (fragmentMatchLength < m_minSearchLength)
+        return false;
+    results.clear();
+    map<string, int> genomeToMatchSeqNum;
+    int numSequences = query.length() / fragmentMatchLength;
+    for (int i = 0; i < numSequences; i++)
+    {
+        string extractSeq;
+        query.extract(i*fragmentMatchLength, fragmentMatchLength, extractSeq);
+        vector<DNAMatch> matched;
+        findGenomesWithThisDNA(extractSeq, fragmentMatchLength, exactMatchOnly, matched);
+        for (int j = 0; j < matched.size(); j++)
+        {
+            pair<map<string,int>::iterator,bool> insert = genomeToMatchSeqNum.insert({matched[j].genomeName, 1});
+            if (insert.second == false)
+                (insert.first)->second++;
+        }
+    }
+    if (genomeToMatchSeqNum.empty())
+        return false;
+    map<string, int>::iterator it;
+    for (it = genomeToMatchSeqNum.begin(); it != genomeToMatchSeqNum.end(); it++)
+    {
+        double pct = ((double)it->second / numSequences) * 100;
+        if (pct >= matchPercentThreshold)
+        {
+            GenomeMatch g;
+            g.genomeName = it->first;
+            g.percentMatch = pct;
+            results.push_back(g);
+        }
+    }
+    if (results.empty())
+        return false;
+    sort(results.begin(), results.end(), orderRelatedGenomes);
+    return true;  // This compiles, but may not be correct
 }
 
 //******************** GenomeMatcher functions ********************************

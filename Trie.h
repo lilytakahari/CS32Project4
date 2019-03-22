@@ -7,18 +7,6 @@
 template<typename ValueType>
 struct TrieNode;
 
-//template<typename ValueType>
-//struct TrieNodeLink
-//{
-//    TrieNodeLink(char key)
-//    {
-//        m_key = key;
-//        m_link = new TrieNode<ValueType>;
-//    }
-//    char m_key;
-//    TrieNode<ValueType>* m_link;
-//};
-
 template<typename ValueType>
 struct TrieNode
 {
@@ -48,14 +36,6 @@ private:
                                       bool exactMatchOnly, TrieNode<ValueType> *curr) const;
     TrieNode<ValueType>* m_root;
 };
-
-//template<typename ValueType>
-//bool operator==(const char ch, const TrieNodeLink<ValueType> &link)
-//{
-//    if (ch == link.m_key)
-//        return true;
-//    return false;
-//}
 
 template<typename ValueType>
 Trie<ValueType>::Trie()
